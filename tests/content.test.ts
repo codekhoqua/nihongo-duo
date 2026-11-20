@@ -62,6 +62,52 @@ describe('course structure', () => {
   });
 });
 
+describe('difficulty ramp for absolute beginners', () => {
+  const lessonsInOrder = UNITS.flatMap((unit) => unit.lessons);
+  const exercisesOf = (lessonId: string) => {
+    const lesson = getLesson(lessonId);
+    expect(lesson, `${lessonId} phải tồn tại`).toBeDefined();
+    return lesson?.exercises ?? [];
+  };
+  const kindsOf = (lessonId: string): string[] =>
+    exercisesOf(lessonId).map((exercise) => exercise.kind);
+
+  it('opens unit 1 with recognition only (no listen-typing)', () => {
+    for (const lessonId of ['u1-l1', 'u1-l2']) {
+      expect(kindsOf(lessonId), lessonId).not.toContain('listen-typing');
+      expect(kindsOf(lessonId).filter((kind) => kind === 'typing'), lessonId).toHaveLength(1);
+    }
+  });
+
+  it('shows the first listen-typing only after kana has been introduced', () => {
+    const first = lessonsInOrder.findIndex((lesson) =>
+      lesson.exercises.some((exercise) => exercise.kind === 'listen-typing'),
+    );
+    expect(first).toBeGreaterThanOrEqual(2);
+    expect(lessonsInOrder[first].id).toBe('u1-l3');
+  });
+
+  it('asks for typing only after the recognition items, with romaji accepted', () => {
+    for (const lessonId of ['u1-l1', 'u1-l2']) {
+      const exercises = exercisesOf(lessonId);
+      const typingIndex = exercises.findIndex((exercise) => exercise.kind === 'typing');
+      expect(typingIndex, lessonId).toBeGreaterThanOrEqual(3);
+      const typingExercise = exercises[typingIndex];
+      if (typingExercise?.kind !== 'typing') throw new Error(`${lessonId}: thiếu bài typing`);
+      expect(typingExercise.accepted.some((variant) => /^[a-z]+$/i.test(variant))).toBe(true);
+    }
+  });
+
+  it('types only kana already taught in the a-row lesson', () => {
+    const typingExercise = exercisesOf('u1-l3').find((exercise) => exercise.kind === 'typing');
+    if (typingExercise?.kind !== 'typing') throw new Error('u1-l3: thiếu bài typing');
+    expect(typingExercise.answerLabel).toMatch(/^[あいうえお]+$/);
+    const kanaVariants = typingExercise.accepted.filter((variant) => /[あ-ん]/.test(variant));
+    expect(kanaVariants.length).toBeGreaterThan(0);
+    for (const variant of kanaVariants) expect(variant).toMatch(/^[あいうえお]+$/);
+  });
+});
+
 describe.each(allLessons)('lesson $lesson.id', ({ unit, lesson }) => {
   it('belongs to the unit that contains it', () => {
     expect(lesson.unitId).toBe(unit.id);

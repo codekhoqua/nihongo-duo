@@ -173,8 +173,6 @@ export interface Settings {
 export interface ProgressState {
   username: string;
   avatar: string;
-  hearts: number;
-  maxHearts: number;
   gems: number;
   xp: number;
   /** Consecutive days with at least one lesson. */
@@ -198,8 +196,6 @@ export interface ProgressState {
 
 export type ProgressAction =
   | { type: 'answer'; correct: boolean }
-  | { type: 'lose-heart' }
-  | { type: 'refill-hearts'; cost?: number }
   | { type: 'buy-gems'; amount: number }
   | { type: 'complete-lesson'; lessonId: string; xp: number; perfect: boolean }
   | { type: 'set-goal'; goal: number }

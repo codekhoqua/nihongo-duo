@@ -10,7 +10,8 @@
     "preview": "vite preview --port 4173 --strictPort",
     "test": "vitest run",
     "test:watch": "vitest",
-    "ui:live": "node tests/ui-live.mjs"
+    "ui:live": "node tests/ui-live.mjs",
+    "ui:live:typing": "node tests/ui-typing-live.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

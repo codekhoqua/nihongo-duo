@@ -431,28 +431,6 @@
   font-weight: 900;
 }
 
-.hearts-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 6px 0 10px;
-  font-size: 20px;
-  line-height: 1;
-}
-
-.hearts-row__empty {
-  filter: grayscale(1);
-  opacity: 0.45;
-}
-
-.shop-reason {
-  margin-top: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--duo-wolf);
-  text-align: center;
-}
-
 .gem-grid {
   display: grid;
   gap: 10px;

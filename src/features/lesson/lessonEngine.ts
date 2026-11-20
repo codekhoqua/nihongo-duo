@@ -2,6 +2,7 @@
  * Pure lesson logic — no React, no DOM, no side effects.
  * Everything in here is unit-tested directly, so keep it deterministic.
  */
+import { HIRAGANA } from '../../content/kana';
 
 const KATAKANA_BLOCK = /[\u30a1-\u30f6]/g;
 
@@ -40,6 +41,116 @@ export function isTypingCorrect(input: string, accepted: string[]): boolean {
   const normalized = normalizeAnswer(input);
   if (!normalized) return false;
   return accepted.some((candidate) => normalizeAnswer(candidate) === normalized);
+}
+
+/** Small kana that are not part of the 46 basic chart. */
+const SMALL_KANA_ROMAJI: Record<string, string> = {
+  'ゃ': 'ya',
+  'ゅ': 'yu',
+  'ょ': 'yo',
+  'ぁ': 'a',
+  'ぃ': 'i',
+  'ぅ': 'u',
+  'ぇ': 'e',
+  'ぉ': 'o',
+};
+
+/** char → romaji, built once from the kana chart (hiragana only). */
+const KANA_TO_ROMAJI: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  for (const kana of HIRAGANA) map[kana.char] = kana.romaji;
+  return { ...map, ...SMALL_KANA_ROMAJI };
+})();
+
+/** Digraphs: base kana + small ゃ/ゅ/ょ. */
+const YOON_ROMAJI: Record<string, string> = {
+  'きゃ': 'kya',
+  'きゅ': 'kyu',
+  'きょ': 'kyo',
+  'しゃ': 'sha',
+  'しゅ': 'shu',
+  'しょ': 'sho',
+  'ちゃ': 'cha',
+  'ちゅ': 'chu',
+  'ちょ': 'cho',
+  'にゃ': 'nya',
+  'にゅ': 'nyu',
+  'にょ': 'nyo',
+  'ひゃ': 'hya',
+  'ひゅ': 'hyu',
+  'ひょ': 'hyo',
+  'みゃ': 'mya',
+  'みゅ': 'myu',
+  'みょ': 'myo',
+  'りゃ': 'rya',
+  'りゅ': 'ryu',
+  'りょ': 'ryo',
+  'ぎゃ': 'gya',
+  'ぎゅ': 'gyu',
+  'ぎょ': 'gyo',
+  'じゃ': 'ja',
+  'じゅ': 'ju',
+  'じょ': 'jo',
+  'びゃ': 'bya',
+  'びゅ': 'byu',
+  'びょ': 'byo',
+  'ぴゃ': 'pya',
+  'ぴゅ': 'pyu',
+  'ぴょ': 'pyo',
+};
+
+const VOWELS = 'aeiou';
+
+/**
+ * Kana → readable romaji, used for the beginner "cách đọc" hint.
+ * Handles katakana input, digraphs (ちゃ → cha), small っ (doubled consonant)
+ * and ー (long vowel). Unknown characters (kanji, latin) pass through unchanged.
+ */
+export function kanaToRomaji(kana: string): string {
+  if (!kana) return '';
+  const chars = [...kana.normalize('NFKC').replace(KATAKANA_BLOCK, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0x60),
+  )];
+  let out = '';
+  let pendingSokuon = false;
+
+  for (let index = 0; index < chars.length; index += 1) {
+    const ch = chars[index];
+
+    if (ch === 'っ') {
+      pendingSokuon = true;
+      continue;
+    }
+    if (ch === 'ー') {
+      const last = out.slice(-1);
+      if (VOWELS.includes(last)) out += last;
+      continue;
+    }
+
+    const digraph = YOON_ROMAJI[ch + (chars[index + 1] ?? '')];
+    const romaji = digraph ?? KANA_TO_ROMAJI[ch];
+
+    if (romaji === undefined) {
+      out += ch;
+      pendingSokuon = false;
+      continue;
+    }
+    if (digraph) index += 1;
+
+    if (pendingSokuon) {
+      out += romaji[0];
+      pendingSokuon = false;
+    }
+    out += romaji;
+  }
+  /* A trailing っ has no next consonant to double. */
+  return out;
+}
+
+/** Romaji hint shown to beginners: prefer a variant the grader really accepts. */
+export function readingHint(exercise: { accepted: string[]; answerLabel: string }): string {
+  const latin = exercise.accepted.find((variant) => /^[a-z][a-z\s]*$/i.test(variant));
+  return latin ?? kanaToRomaji(exercise.answerLabel);
 }
 
 /** Word-bank answer: same tokens in the same order (normalized per token). */

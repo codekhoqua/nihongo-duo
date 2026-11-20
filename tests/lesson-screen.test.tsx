@@ -78,9 +78,10 @@ afterEach(() => {
   cleanup();
 });
 
-describe('PathScreen — hết tim thì không vào được bài', () => {
-  it('chặn mở bài và hiện thông báo khi hearts = 0', async () => {
-    seed({ hearts: 0, completedLessons: [] });
+describe('PathScreen — học miễn phí, không chặn vì tim', () => {
+  it('vẫn mở bài khi localStorage cũ còn hearts = 0', async () => {
+    const legacy = { ...DEFAULT_STATE, hearts: 0, maxHearts: 5, completedLessons: [] };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...legacy, version: 0 }));
     const started: string[] = [];
     render(
       <ProgressProvider>
@@ -90,12 +91,13 @@ describe('PathScreen — hết tim thì không vào được bài', () => {
 
     fireEvent.click(await screen.findByTestId('lesson-node-u1-l1'));
 
-    expect(started).toEqual([]);
-    expect(screen.getByRole('status').textContent).toMatch(/hết mạng/i);
+    expect(started).toEqual(['u1-l1']);
+    expect(screen.queryByTestId('hearts-banner')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
-  it('cho mở bài bình thường khi còn tim', async () => {
-    seed({ hearts: 5, completedLessons: [] });
+  it('cho mở bài bình thường với state mới (không còn tim)', async () => {
+    seed({ completedLessons: [] });
     const started: string[] = [];
     render(
       <ProgressProvider>
@@ -109,8 +111,8 @@ describe('PathScreen — hết tim thì không vào được bài', () => {
 });
 
 describe('LessonScreen — trả lời sai', () => {
-  it('mất 1 tim và hiện đáp án đúng', async () => {
-    seed({ hearts: 5, completedLessons: [] });
+  it('hiện đáp án đúng và không trừ tim', async () => {
+    seed({ completedLessons: [] });
     render(
       <ProgressProvider>
         <LessonScreen lessonId="u1-l1" onExit={() => undefined} />
@@ -129,13 +131,14 @@ describe('LessonScreen — trả lời sai', () => {
     const verdict = await screen.findByTestId('verdict');
     expect(verdict.textContent).toMatch(/sai rồi/i);
     expect(verdict.textContent).toMatch(/đáp án đúng/i);
-    await waitFor(() => expect(read()?.hearts).toBe(4));
+    await waitFor(() => expect(read()?.totalAnswers).toBe(1));
+    expect(read()).not.toHaveProperty('hearts');
   });
 });
 
 describe('LessonScreen — ghép cặp sai', () => {
   it('không đạt "hoàn hảo", không +5 XP, mỗi câu chỉ tính 1 answer', async () => {
-    seed({ hearts: 5, completedLessons: [] });
+    seed({ completedLessons: [] });
     const exits: string[] = [];
     render(
       <ProgressProvider>
@@ -175,7 +178,7 @@ describe('LessonScreen — ghép cặp sai', () => {
 
     const state = read();
     expect(state?.totalAnswers).toBe(LESSON!.exercises.length);
-    expect(state?.hearts).toBe(4);
+    expect(state).not.toHaveProperty('hearts');
   });
 });
 

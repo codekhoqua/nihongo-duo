@@ -69,14 +69,14 @@ export default function App() {
               {state.gems}
             </span>
             <span
-              className={`topbar__stat${state.hearts <= 1 ? ' topbar__stat--danger' : ''}`}
-              title="Mạng (hearts)"
+              className="topbar__stat"
+              title="Học miễn phí — không giới hạn tim"
+              aria-label="Không giới hạn tim"
               data-testid="hearts-stat"
             >
               <span className="topbar__stat-icon" aria-hidden="true">
-                {state.hearts > 0 ? '❤️' : '🖤'}
+                ♾️
               </span>
-              {state.hearts}
             </span>
             <span className="topbar__stat" title="Kim cương/XP" data-testid="xp-stat">
               <span className="topbar__stat-icon" aria-hidden="true">

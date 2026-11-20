@@ -36,41 +36,6 @@ describe('progressReducer / answer', () => {
   });
 });
 
-describe('progressReducer / hearts', () => {
-  it('lose-heart removes exactly one heart', () => {
-    expect(progressReducer(base({ hearts: 5 }), { type: 'lose-heart' }).hearts).toBe(4);
-  });
-
-  it('lose-heart never goes below zero', () => {
-    expect(progressReducer(base({ hearts: 0 }), { type: 'lose-heart' }).hearts).toBe(0);
-  });
-
-  it('refill-hearts with enough gems fills to max and charges 350 by default', () => {
-    const next = progressReducer(base({ hearts: 2, gems: 500 }), { type: 'refill-hearts' });
-    expect(next.hearts).toBe(5);
-    expect(next.gems).toBe(150);
-  });
-
-  it('refill-hearts honours a custom cost', () => {
-    const next = progressReducer(base({ hearts: 1, gems: 500 }), {
-      type: 'refill-hearts',
-      cost: 100,
-    });
-    expect(next.hearts).toBe(5);
-    expect(next.gems).toBe(400);
-  });
-
-  it('refill-hearts with too few gems changes nothing', () => {
-    const start = base({ hearts: 2, gems: 100 });
-    expect(progressReducer(start, { type: 'refill-hearts' })).toBe(start);
-  });
-
-  it('refill-hearts when hearts are already full changes nothing', () => {
-    const start = base({ hearts: 5, gems: 1000 });
-    expect(progressReducer(start, { type: 'refill-hearts' })).toBe(start);
-  });
-});
-
 describe('progressReducer / complete-lesson', () => {
   it('adds xp, dailyXp, a crown, the lesson id, perfect gems and a first streak', () => {
     const next = progressReducer(base(), {
@@ -142,6 +107,14 @@ describe('progressReducer / complete-lesson', () => {
   });
 });
 
+describe('progressReducer / gems', () => {
+  it('buy-gems adds the pack amount', () => {
+    const next = progressReducer(base({ gems: 100 }), { type: 'buy-gems', amount: 500 });
+    expect(next.gems).toBe(600);
+    expect(next.version).toBe(1);
+  });
+});
+
 describe('progressReducer / profile & settings', () => {
   it('set-goal updates dailyGoal', () => {
     expect(progressReducer(base(), { type: 'set-goal', goal: 80 }).dailyGoal).toBe(80);
@@ -177,10 +150,9 @@ describe('progressReducer / profile & settings', () => {
   });
 
   it('reset restores defaults but keeps the version counter moving', () => {
-    const start = base({ xp: 999, hearts: 1, version: 12 });
+    const start = base({ xp: 999, version: 12 });
     const next = progressReducer(start, { type: 'reset' });
     expect(next.xp).toBe(DEFAULT_STATE.xp);
-    expect(next.hearts).toBe(DEFAULT_STATE.hearts);
     expect(next.version).toBe(13);
   });
 });

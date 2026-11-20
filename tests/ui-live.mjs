@@ -357,13 +357,6 @@ async function readVerdict() {
   })()`);
 }
 
-async function readHearts() {
-  return evaluate(`(() => {
-    const el = document.querySelector('.lesson__hearts');
-    return el ? (el.innerText || el.textContent || '').trim() : '';
-  })()`);
-}
-
 async function readProgressState() {
   try {
     const raw = await evaluate(`localStorage.getItem(${q(STORAGE_KEY)})`);
@@ -437,14 +430,18 @@ const bannerText = await evaluate(`(() => {
 })()`);
 const heartsRect = await centerOf('[data-testid="hearts-stat"]');
 const heartsText = heartsRect?.text ?? '';
-const homeOk = homeReady && nodeCount >= 25 && !!bannerText && /5/.test(heartsText);
+const heartsLabel = await evaluate(
+  `document.querySelector('[data-testid="hearts-stat"]')?.getAttribute('aria-label') ?? ''`,
+);
+const unlimitedHearts = /♾/.test(heartsText) && !/\d/.test(heartsText) && heartsLabel === 'Không giới hạn tim';
+const homeOk = homeReady && nodeCount >= 25 && !!bannerText && unlimitedHearts;
 record(
   1,
   `home loaded, ${nodeCount} lesson nodes, banner "${bannerText}"`,
   '[data-testid="hearts-stat"]',
   heartsRect,
   homeOk,
-  `hearts="${heartsText}"`,
+  `hearts="${heartsText}" label="${heartsLabel}" unlimited=${unlimitedHearts}`,
 );
 await shot('step-01-home.png');
 
@@ -477,15 +474,29 @@ const q1Enabled = await waitFor(checkButtonEnabled, 4000, 'check enabled');
 const checkRect = await click('[data-testid="check-button"]');
 const verdictReady = await waitFor(hasVerdict, 6000, 'verdict');
 const verdict1 = await readVerdict();
-const heartsAfterQ1 = await readHearts();
-const q1Ok = !!q1Rect && q1Selected && q1Enabled && !!checkRect && verdictReady && /Chính xác/.test(verdict1);
+const lessonHeader = await evaluate(`(() => {
+  const top = document.querySelector('.lesson__top');
+  return {
+    hasHeartsSpan: !!document.querySelector('.lesson__hearts'),
+    text: top ? top.innerText.trim().replace(/\\s+/g, ' ') : '',
+  };
+})()`);
+const lessonHeartsGone = !lessonHeader.hasHeartsSpan && !/❤/.test(lessonHeader.text);
+const q1Ok =
+  !!q1Rect &&
+  q1Selected &&
+  q1Enabled &&
+  !!checkRect &&
+  verdictReady &&
+  /Chính xác/.test(verdict1) &&
+  lessonHeartsGone;
 record(
   3,
   `answer Q1 (${q1.kind}) correctly → CHECK → verdict`,
   q1Selector,
   q1Rect,
   q1Ok,
-  `verdict="${verdict1}" hearts="${heartsAfterQ1}"`,
+  `verdict="${verdict1}" lessonHeaderHearts=${lessonHeader.hasHeartsSpan} header="${lessonHeader.text}"`,
 );
 await shot('step-03-feedback.png');
 const continueRect = await click('[data-testid="continue-button"]');
@@ -561,7 +572,6 @@ for (let index = 1; index < LESSON.exercises.length; index += 1) {
     const check = await click('[data-testid="check-button"]');
     const shown = await waitFor(hasVerdict, 6000, `${exercise.id} verdict`);
     const verdict = await readVerdict();
-    const hearts = await readHearts();
     const ok = enabled && !!check && shown && /Chính xác/.test(verdict);
     record(
       `4.${index}`,
@@ -569,13 +579,12 @@ for (let index = 1; index < LESSON.exercises.length; index += 1) {
       actionSelector,
       actionRect,
       ok,
-      `verdict="${verdict}" hearts="${hearts}"`,
+      `verdict="${verdict}"`,
     );
     if (!ok) lessonFailed = true;
   } else {
     const shown = await waitFor(hasVerdict, 8000, `${exercise.id} verdict`);
     const verdict = await readVerdict();
-    const hearts = await readHearts();
     const ok = shown && /Chính xác/.test(verdict);
     record(
       `4.${index}`,
@@ -583,7 +592,7 @@ for (let index = 1; index < LESSON.exercises.length; index += 1) {
       actionSelector,
       actionRect,
       ok,
-      `verdict="${verdict}" hearts="${hearts}"`,
+      `verdict="${verdict}"`,
     );
     if (!ok) lessonFailed = true;
   }
@@ -684,23 +693,30 @@ await shot('step-07-leaderboard.png');
 
 /* step 8 — shop */
 const navShopRect = await click('[data-testid="nav-shop"]');
-const shopReady = await waitFor(`!!document.querySelector('[data-testid="shop-refill"]')`, 6000, 'shop');
+const shopReady = await waitFor(`!!document.querySelector('#shop-free-title')`, 6000, 'shop');
 const shopInfo = await evaluate(`(() => {
-  const b = document.querySelector('[data-testid="shop-refill"]');
-  const hint = document.querySelector('.shop-reason');
+  const title = document.querySelector('#shop-free-title');
+  const hint = document.querySelector('.shop-hint');
   return {
-    disabled: !!b?.disabled,
-    label: (b?.innerText || '').trim(),
-    hint: hint ? hint.innerText.trim() : '',
+    title: title ? title.innerText.trim() : '',
+    hint: hint ? hint.innerText.trim().replace(/\\s+/g, ' ') : '',
+    refill: !!document.querySelector('[data-testid="shop-refill"]'),
+    heartCard: /Tim của bạn/.test(document.body.innerText),
+    bodyText: document.body.innerText.replace(/\\s+/g, ' ').slice(0, 400),
   };
 })()`);
 record(
   8,
-  'shop: refill button present with full-hearts state',
-  '[data-testid="shop-refill"]',
+  'shop: free-learning section, no hearts card / refill button',
+  '#shop-free-title',
   navShopRect,
-  !!navShopRect && shopReady && shopInfo.disabled && shopInfo.hint.length > 0,
-  `disabled=${shopInfo.disabled} hint="${shopInfo.hint}" label="${shopInfo.label}"`,
+  !!navShopRect &&
+    shopReady &&
+    /Học miễn phí/.test(shopInfo.title) &&
+    /không cần nạp tim/i.test(shopInfo.hint) &&
+    !shopInfo.refill &&
+    !shopInfo.heartCard,
+  `title="${shopInfo.title}" hint="${shopInfo.hint}" refill=${shopInfo.refill} heartCard=${shopInfo.heartCard}`,
 );
 await shot('step-08-shop.png');
 
@@ -765,6 +781,106 @@ record(
   `nodes=${desktop.nodes} scrollWidth=${desktop.scrollWidth} innerWidth=${desktop.innerWidth}`,
 );
 await shot('step-11-desktop.png');
+
+/* step 12 — legacy save (hearts:0 / maxHearts:5) must not lock the user out */
+await session.send('Emulation.setDeviceMetricsOverride', {
+  width: 390,
+  height: 844,
+  deviceScaleFactor: 2,
+  mobile: true,
+});
+await evaluate(`localStorage.setItem(${q(STORAGE_KEY)}, JSON.stringify({
+  username: 'Học viên cũ',
+  avatar: '🦊',
+  gems: 500,
+  xp: 40,
+  streak: 3,
+  longestStreak: 5,
+  lastActiveDate: null,
+  dailyXp: 10,
+  dailyGoal: 50,
+  crowns: {},
+  completedLessons: [],
+  perfectLessons: 0,
+  totalAnswers: 4,
+  correctAnswers: 2,
+  settings: { soundOn: true, speechOn: true },
+  version: 0,
+  hearts: 0,
+  maxHearts: 5
+}))`);
+await session.send('Page.navigate', { url: `${APP}/#path` });
+await session.send('Page.reload', { ignoreCache: true });
+const legacyReady = await waitFor(
+  `document.querySelectorAll('[data-testid^="lesson-node-"]').length >= 25`,
+  15000,
+  'legacy path',
+);
+const legacyStatRect = await centerOf('[data-testid="hearts-stat"]');
+const legacyStatText = legacyStatRect?.text ?? '';
+const legacyBanner = await evaluate(
+  `!!document.querySelector('.hearts-banner') || !!document.querySelector('[data-testid="hearts-banner"]')`,
+);
+const legacyNodeRect = await click('[data-testid="lesson-node-u1-l1"]');
+const legacyLessonReady = await waitFor(
+  `!!document.querySelector('[role="progressbar"]') && !!document.querySelector('[data-testid="lesson-close"]')`,
+  8000,
+  'legacy lesson',
+);
+await sleep(300);
+const legacyDom = await evaluate(`({
+  banner: !!document.querySelector('.hearts-banner') || !!document.querySelector('[data-testid="hearts-banner"]'),
+  lessonHearts: !!document.querySelector('.lesson__hearts'),
+  outOfHearts: /hết mạng/i.test(document.body.innerText),
+  headerText: (document.querySelector('.lesson__top')?.innerText ?? '').trim().replace(/\\s+/g, ' '),
+})`);
+record(
+  12,
+  'legacy save hearts:0 → path + lesson open, no banner/modal',
+  '[data-testid="lesson-node-u1-l1"]',
+  legacyNodeRect,
+  legacyReady &&
+    /♾/.test(legacyStatText) &&
+    !/\d/.test(legacyStatText) &&
+    !legacyBanner &&
+    !!legacyNodeRect &&
+    legacyLessonReady &&
+    !legacyDom.banner &&
+    !legacyDom.lessonHearts &&
+    !legacyDom.outOfHearts,
+  `heartsStat="${legacyStatText}" banner=${legacyDom.banner} lessonHearts=${legacyDom.lessonHearts} outOfHearts=${legacyDom.outOfHearts} header="${legacyDom.headerText}"`,
+);
+await shot('step-12-legacy-hearts0-lesson.png');
+
+/* step 13 — answering WRONG with legacy hearts:0 must not lose hearts or show an out-of-hearts modal */
+const legacyWrongRect = await click('[data-testid="choice-b"]');
+const legacyWrongEnabled = await waitFor(checkButtonEnabled, 4000, 'legacy wrong check enabled');
+const legacyCheckRect = await click('[data-testid="check-button"]');
+const legacyWrongReady = await waitFor(hasVerdict, 6000, 'legacy wrong verdict');
+const legacyWrongVerdict = await readVerdict();
+const legacyAfterWrong = await evaluate(`({
+  inLesson: !!document.querySelector('[role="progressbar"]') && !!document.querySelector('[data-testid="lesson-close"]'),
+  outOfHearts: /hết mạng/i.test(document.body.innerText),
+  lessonHearts: !!document.querySelector('.lesson__hearts'),
+  continueButton: !!document.querySelector('[data-testid="continue-button"]'),
+})`);
+record(
+  13,
+  'wrong answer on legacy hearts:0 → verdict "Sai rồi", no modal, lesson continues',
+  '[data-testid="choice-b"]',
+  legacyWrongRect,
+  !!legacyWrongRect &&
+    legacyWrongEnabled &&
+    !!legacyCheckRect &&
+    legacyWrongReady &&
+    /Sai rồi/.test(legacyWrongVerdict) &&
+    legacyAfterWrong.inLesson &&
+    !legacyAfterWrong.outOfHearts &&
+    !legacyAfterWrong.lessonHearts &&
+    legacyAfterWrong.continueButton,
+  `verdict="${legacyWrongVerdict}" inLesson=${legacyAfterWrong.inLesson} outOfHearts=${legacyAfterWrong.outOfHearts} continue=${legacyAfterWrong.continueButton}`,
+);
+await shot('step-13-legacy-wrong-answer.png');
 
 /* -------------------------------------------------------------- summary */
 

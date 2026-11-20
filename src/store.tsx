@@ -15,8 +15,6 @@ export const STORAGE_KEY = 'nihongo-duo:progress:v1';
 export const DEFAULT_STATE: ProgressState = {
   username: 'Học viên',
   avatar: '🦊',
-  hearts: 5,
-  maxHearts: 5,
   gems: 500,
   xp: 0,
   streak: 0,
@@ -63,20 +61,6 @@ export function progressReducer(state: ProgressState, action: ProgressAction): P
       const total = state.totalAnswers + 1;
       const correct = state.correctAnswers + (action.correct ? 1 : 0);
       return { ...state, totalAnswers: total, correctAnswers: correct, version: state.version + 1 };
-    }
-
-    case 'lose-heart':
-      return { ...state, hearts: Math.max(0, state.hearts - 1), version: state.version + 1 };
-
-    case 'refill-hearts': {
-      const cost = action.cost ?? 350;
-      if (state.gems < cost || state.hearts >= state.maxHearts) return state;
-      return {
-        ...state,
-        hearts: state.maxHearts,
-        gems: state.gems - cost,
-        version: state.version + 1,
-      };
     }
 
     case 'buy-gems':

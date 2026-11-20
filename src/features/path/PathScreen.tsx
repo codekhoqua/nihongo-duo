@@ -9,7 +9,6 @@ import './path.css';
 /** Zig-zag offsets (px) applied to node index % 8. */
 const NODE_OFFSETS = [0, 42, 68, 42, 0, -42, -68, -42];
 const LINK_HEIGHT = 32;
-const REFILL_COST = 350;
 
 const LESSON_ICONS: Record<LessonIcon, string> = {
   star: '⭐',
@@ -72,7 +71,7 @@ function nodeLabel(lesson: Lesson, status: NodeStatus, crowns: number): string {
 }
 
 export default function PathScreen({ onStartLesson }: { onStartLesson: (lessonId: string) => void }) {
-  const { state, dispatch } = useProgress();
+  const { state } = useProgress();
   const quests = useDailyQuests();
 
   const [toast, setToast] = useState<string | null>(null);
@@ -82,7 +81,6 @@ export default function PathScreen({ onStartLesson }: { onStartLesson: (lessonId
 
   const toastTimer = useRef<number | null>(null);
   const shakeTimer = useRef<number | null>(null);
-  const bannerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(
     () => () => {
@@ -126,11 +124,6 @@ export default function PathScreen({ onStartLesson }: { onStartLesson: (lessonId
   };
 
   const handleNodeClick = (lesson: Lesson, status: NodeStatus) => {
-    if (state.hearts === 0) {
-      showToast('Bạn đã hết mạng! Nạp tim để học tiếp');
-      bannerRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
-      return;
-    }
     if (status === 'locked') {
       shake(lesson.id);
       showToast('Hoàn thành bài trước nhé!');
@@ -149,29 +142,8 @@ export default function PathScreen({ onStartLesson }: { onStartLesson: (lessonId
   const tipDialogRef = useFocusTrap<HTMLDivElement>(Boolean(tipUnit), closeDialogs);
   const jumpDialogRef = useFocusTrap<HTMLDivElement>(jumpOpen, closeDialogs);
 
-  const heartsEmpty = state.hearts === 0;
-  const canRefill = state.gems >= REFILL_COST;
-
   return (
     <div className="screen path">
-      {heartsEmpty && (
-        <div className="hearts-banner" role="alert" data-testid="hearts-banner" ref={bannerRef}>
-          <span className="hearts-banner__text">
-            <span aria-hidden="true">💔</span> Bạn đã hết mạng!
-          </span>
-          <button
-            type="button"
-            className="btn btn--danger btn--sm"
-            onClick={() => dispatch({ type: 'refill-hearts' })}
-            disabled={!canRefill}
-            data-testid="refill-hearts-banner"
-          >
-            Nạp mạng ({REFILL_COST} 💎)
-          </button>
-          {!canRefill && <span className="hearts-banner__note">Không đủ đá quý</span>}
-        </div>
-      )}
-
       <div className="path-layout">
         <div className="path-main">
           {UNITS.map((unit) => {

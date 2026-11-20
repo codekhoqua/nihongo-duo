@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
 import type { TypingExercise } from '../../../types';
 import type { SpeakHandler } from './types';
+import TypingField from './TypingField';
 
 interface Props {
   exercise: TypingExercise;
@@ -8,19 +8,19 @@ interface Props {
   disabled: boolean;
   onChange: (value: string) => void;
   onSpeak: SpeakHandler;
+  beginner?: boolean;
 }
 
 /** Audio only → type what you hear. */
-export default function ListenTyping({ exercise, value, disabled, onChange, onSpeak }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
+export default function ListenTyping({
+  exercise,
+  value,
+  disabled,
+  onChange,
+  onSpeak,
+  beginner,
+}: Props) {
   const audio = exercise.audioText ?? exercise.japanese ?? '';
-
-  useEffect(() => {
-    const node = inputRef.current;
-    if (!node) return;
-    const timer = window.setTimeout(() => node.focus(), 320);
-    return () => window.clearTimeout(timer);
-  }, [exercise.id]);
 
   return (
     <div className="ex ex--listen">
@@ -35,25 +35,15 @@ export default function ListenTyping({ exercise, value, disabled, onChange, onSp
         >
           🔊
         </button>
-        <p className="listen-hint">Nghe và viết lại bằng tiếng Nhật</p>
+        <p className="listen-hint">Nghe và viết lại (romaji cũng được)</p>
       </div>
 
-      <input
-        ref={inputRef}
-        className="typing-input jp"
-        type="text"
-        inputMode="text"
-        lang="ja"
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        placeholder="Nhập câu trả lời…"
-        aria-label="Câu trả lời"
+      <TypingField
+        exercise={exercise}
         value={value}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        data-testid="typing-input"
+        onChange={onChange}
+        beginner={beginner}
       />
     </div>
   );

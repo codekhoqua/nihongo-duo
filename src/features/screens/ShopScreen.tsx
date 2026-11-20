@@ -3,8 +3,6 @@ import { useProgress } from '../../store';
 import { useFocusTrap } from '../../lib/useFocusTrap';
 import './screens.css';
 
-const REFILL_COST = 350;
-
 const GEM_PACKS = [
   { amount: 100, label: 'Gói nhỏ', note: 'Bắt đầu tích luỹ', badge: '' },
   { amount: 500, label: 'Gói vừa', note: 'Nhiều người chọn', badge: 'Phổ biến' },
@@ -24,19 +22,6 @@ export default function ShopScreen({ onBack }: { onBack: () => void }) {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const heartsFull = state.hearts >= state.maxHearts;
-  const missingGems = REFILL_COST - state.gems;
-  const refillReason = heartsFull
-    ? 'Tim đang đầy, chưa cần nạp.'
-    : missingGems > 0
-      ? `Bạn còn thiếu ${missingGems} 💎 để nạp tim.`
-      : null;
-
-  function refillHearts() {
-    dispatch({ type: 'refill-hearts', cost: REFILL_COST });
-    setToast('Đã nạp đầy tim!');
-  }
-
   function buyGems(amount: number) {
     dispatch({ type: 'buy-gems', amount });
     setToast(`Đã nhận ${amount} 💎 (bản demo)`);
@@ -55,33 +40,13 @@ export default function ShopScreen({ onBack }: { onBack: () => void }) {
         </span>
       </div>
 
-      <section className="shop-card" aria-labelledby="shop-hearts-title">
+      <section className="shop-card" aria-labelledby="shop-free-title">
         <div className="shop-card__head">
-          <h2 className="shop-card__title" id="shop-hearts-title">
-            ❤️ Tim của bạn
+          <h2 className="shop-card__title" id="shop-free-title">
+            Học miễn phí
           </h2>
-          <span className="pill pill--red">
-            {state.hearts}/{state.maxHearts}
-          </span>
         </div>
-        <div className="hearts-row" aria-hidden="true">
-          {Array.from({ length: state.maxHearts }, (_, index) => (
-            <span key={index} className={index < state.hearts ? undefined : 'hearts-row__empty'}>
-              {index < state.hearts ? '❤️' : '🖤'}
-            </span>
-          ))}
-        </div>
-        <p className="shop-hint">Mỗi lần trả lời sai sẽ mất một tim.</p>
-        <button
-          type="button"
-          className="btn btn--primary btn--block"
-          data-testid="shop-refill"
-          disabled={heartsFull || missingGems > 0}
-          onClick={refillHearts}
-        >
-          Nạp đầy {REFILL_COST} 💎
-        </button>
-        {refillReason && <p className="shop-reason">{refillReason}</p>}
+        <p className="shop-hint">Không giới hạn lượt học, không cần nạp tim.</p>
       </section>
 
       <h2 className="section-title">Nạp kim cương</h2>

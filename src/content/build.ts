@@ -20,6 +20,7 @@ export const PROMPT = {
   meaning: 'Chọn nghĩa đúng',
   reading: 'Chọn cách đọc đúng',
   translate: 'Dịch câu này',
+  write: 'Viết bằng tiếng Nhật',
   listen: 'Nghe và viết lại',
   match: 'Ghép cặp',
   fill: 'Điền vào chỗ trống',
@@ -174,10 +175,12 @@ interface TypingArgs {
 
 export function typing(args: TypingArgs): TypingExercise {
   const kind = args.kind ?? 'typing';
+  const prompt =
+    kind === 'listen-typing' ? PROMPT.listen : args.text ? PROMPT.write : PROMPT.translate;
   return {
     id: args.id,
     kind,
-    prompt: kind === 'listen-typing' ? PROMPT.listen : PROMPT.translate,
+    prompt,
     text: args.text,
     audioText: args.audioText ?? args.answerLabel,
     accepted: [...args.accepted],

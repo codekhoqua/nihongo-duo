@@ -4,7 +4,7 @@ import { getLesson } from '../../content';
 import { playSfx } from '../../lib/sfx';
 import { speak, stopSpeaking } from '../../lib/speech';
 import { useFocusTrap } from '../../lib/useFocusTrap';
-import type { Exercise } from '../../types';
+import type { Exercise, ExerciseKind } from '../../types';
 import { gradeLesson, isTypingCorrect, isWordBankCorrect } from './lessonEngine';
 import TranslateChoice from './exercises/TranslateChoice';
 import SelectImage from './exercises/SelectImage';
@@ -42,7 +42,16 @@ interface Result {
   perfect: boolean;
 }
 
-const REFILL_COST = 350;
+/**
+ * Kinds whose audio is the question itself (Japanese already on screen), so they
+ * can be spoken automatically. `typing`, `word-bank` and `fill-blank` carry the
+ * answer in `audioText`, so they must stay click-only.
+ */
+const AUTO_SPEAK_KINDS: ReadonlySet<ExerciseKind> = new Set<ExerciseKind>([
+  'translate-choice',
+  'select-image',
+  'listen-typing',
+]);
 
 function evaluate(exercise: Exercise, draft: Draft): Feedback {
   switch (exercise.kind) {
@@ -112,15 +121,17 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
   const [text, setText] = useState('');
 
   const [confirmExit, setConfirmExit] = useState(false);
-  const [heartsModal, setHeartsModal] = useState(false);
+
+  /** Units 1–2 are for absolute beginners: keep the kana pad open for them. */
+  const beginner = lesson?.unitId === 'u1' || lesson?.unitId === 'u2';
 
   const completedRef = useRef(false);
   const answeredRef = useRef<Set<string>>(new Set());
   const penalizedMatch = useRef<Set<string>>(new Set());
-  const heartsModalShown = useRef(false);
+  /** Exercise ids already auto-spoken in this lesson run (play once, not on retry). */
+  const autoSpokenRef = useRef<Set<string>>(new Set());
 
   const exitDialogRef = useFocusTrap<HTMLDivElement>(confirmExit, () => setConfirmExit(false));
-  const heartsDialogRef = useFocusTrap<HTMLDivElement>(heartsModal);
 
   const current = queue[cursor];
   const exercise = current?.exercise;
@@ -150,7 +161,7 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
     completedRef.current = false;
     answeredRef.current = new Set();
     penalizedMatch.current = new Set();
-    heartsModalShown.current = false;
+    autoSpokenRef.current = new Set();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId]);
 
@@ -161,23 +172,17 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
     [],
   );
 
-  /* Out of hearts, mid lesson. */
+  /* Auto-play the question audio the first time a listening-friendly item shows up. */
   useEffect(() => {
-    if (state.hearts > 0) {
-      heartsModalShown.current = false;
-      return;
-    }
-    if (phase === 'result' || heartsModalShown.current) return;
-    heartsModalShown.current = true;
-    setHeartsModal(true);
-  }, [state.hearts, phase]);
-
-  /* Auto-play the listening exercise once per item. */
-  useEffect(() => {
-    if (!exercise || exercise.kind !== 'listen-typing') return;
+    if (!exercise || !AUTO_SPEAK_KINDS.has(exercise.kind)) return;
+    if (autoSpokenRef.current.has(exercise.id)) return;
     const audio = exercise.audioText ?? exercise.japanese ?? '';
     if (!audio) return;
-    const timer = window.setTimeout(() => speak(audio, { enabled: speechOn }), 260);
+    /* Mark only once the timer actually fires, so StrictMode's remount doesn't eat it. */
+    const timer = window.setTimeout(() => {
+      autoSpokenRef.current.add(exercise.id);
+      speak(audio, { enabled: speechOn });
+    }, 260);
     return () => window.clearTimeout(timer);
   }, [exercise, speechOn]);
 
@@ -202,8 +207,6 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
 
   const handleCheck = useCallback(() => {
     if (!current || phase !== 'answering') return;
-    /* Out of hearts: the "Hết mạng" dialog must be resolved first. */
-    if (state.hearts === 0) return;
     const target = current.exercise;
     if (!canCheck(target, { choiceId, bank, text })) return;
 
@@ -225,16 +228,13 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
     }
 
     playSfx('wrong', soundOn);
-    dispatch({ type: 'lose-heart' });
     if (current.pass === 0) {
       setQueue((prev) => [...prev, { exercise: target, pass: 1 }]);
     }
-  }, [current, phase, state.hearts, choiceId, bank, text, dispatch, soundOn]);
+  }, [current, phase, choiceId, bank, text, dispatch, soundOn]);
 
   const handleContinue = useCallback(() => {
     if (phase !== 'feedback') return;
-    /* Do not leave the feedback screen while out of hearts. */
-    if (state.hearts === 0) return;
     if (cursor + 1 >= queue.length) {
       finish();
       return;
@@ -243,7 +243,7 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
     setPhase('answering');
     resetDraft();
     setCursor(cursor + 1);
-  }, [phase, state.hearts, cursor, queue.length, finish, resetDraft]);
+  }, [phase, cursor, queue.length, finish, resetDraft]);
 
   const handleFinish = useCallback(() => {
     if (!result) return;
@@ -266,7 +266,6 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
 
   const handleMatchComplete = useCallback(() => {
     if (!current || phase !== 'answering') return;
-    if (state.hearts === 0) return;
     const target = current.exercise;
     const verdict = evaluate(target, { choiceId, bank, text });
     setFeedback(verdict);
@@ -280,7 +279,7 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
     setFirstResults((prev) =>
       prev[target.id] !== undefined ? prev : { ...prev, [target.id]: true },
     );
-  }, [current, phase, state.hearts, choiceId, bank, text, dispatch, soundOn]);
+  }, [current, phase, choiceId, bank, text, dispatch, soundOn]);
 
   const handleMatchMistake = useCallback(() => {
     if (!exercise) return;
@@ -295,7 +294,6 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
     }
     if (penalizedMatch.current.has(target.id)) return;
     penalizedMatch.current.add(target.id);
-    dispatch({ type: 'lose-heart' });
     playSfx('wrong', soundOn);
   }, [exercise, dispatch, soundOn]);
 
@@ -308,20 +306,13 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
     [],
   );
 
-  const handleRefill = useCallback(() => {
-    if (state.gems < REFILL_COST) return;
-    dispatch({ type: 'refill-hearts' });
-    setHeartsModal(false);
-    heartsModalShown.current = false;
-  }, [state.gems, dispatch]);
-
   /* ------------------------------------------------------------ keyboard */
 
   const checkable = canCheck(exercise, { choiceId, bank, text });
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (confirmExit || heartsModal) return;
+      if (confirmExit) return;
       const target = event.target as HTMLElement | null;
       const inField = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA';
 
@@ -351,7 +342,6 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
     confirmExit,
-    heartsModal,
     phase,
     exercise,
     checkable,
@@ -446,10 +436,6 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
             style={{ width: `${Math.min(100, Math.round((doneCount / Math.max(1, total)) * 100))}%` }}
           />
         </div>
-        <span className="lesson__hearts" title="Mạng còn lại" aria-label={`Còn ${state.hearts} mạng`}>
-          <span aria-hidden="true">❤️</span>
-          {state.hearts}
-        </span>
       </header>
 
       <div className="lesson__scroll">
@@ -505,6 +491,7 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
                   value={text}
                   disabled={phase !== 'answering'}
                   onChange={setText}
+                  beginner={beginner}
                 />
               )}
 
@@ -515,6 +502,7 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
                   disabled={phase !== 'answering'}
                   onChange={setText}
                   onSpeak={handleSpeak}
+                  beginner={beginner}
                 />
               )}
 
@@ -609,46 +597,6 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
                 THOÁT
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {heartsModal && (
-        <div className="modal-backdrop">
-          <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="hearts-title"
-            data-testid="hearts-modal"
-            ref={heartsDialogRef}
-          >
-            <p className="modal__emoji" aria-hidden="true">
-              💔
-            </p>
-            <h2 id="hearts-title" className="h2">
-              Bạn đã hết mạng!
-            </h2>
-            <p className="muted" style={{ marginTop: 8 }}>
-              Nạp đầy mạng để tiếp tục bài học.
-            </p>
-            <div className="modal__actions">
-              <button
-                type="button"
-                className="btn btn--primary grow"
-                onClick={handleRefill}
-                disabled={state.gems < REFILL_COST}
-                data-testid="refill-hearts"
-              >
-                Nạp 350 💎
-              </button>
-              <button type="button" className="btn btn--secondary grow" onClick={handleExit}>
-                Thoát bài
-              </button>
-            </div>
-            {state.gems < REFILL_COST && (
-              <p className="modal__note">Không đủ đá quý</p>
-            )}
           </div>
         </div>
       )}

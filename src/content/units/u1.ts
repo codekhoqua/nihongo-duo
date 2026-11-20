@@ -1,6 +1,11 @@
 import type { Unit } from '../../types';
 import { fillBlank, matchPairs, selectImage, translateChoice, typing, wordBank } from '../build';
 
+/**
+ * Độ khó tăng dần: u1-l1/l2 chỉ dùng dạng nhận biết (chọn nghĩa / chọn hình /
+ * ghép cặp / xếp câu) + đúng 1 bài gõ có trợ giúp (kana pad + romaji), xếp sau
+ * các bài nhận biết. `listen-typing` chỉ từ u1-l3 trở đi, sau khi đã dạy kana.
+ */
 export const U1: Unit = {
   id: 'u1',
   index: 1,
@@ -47,20 +52,24 @@ export const U1: Unit = {
             ['さようなら', 'Tạm biệt'],
           ],
         }),
-        typing({
+        selectImage({
           id: 'u1-l1-e4',
+          explanation: 'こんばんは dùng sau khi trời đã tối.',
+          japanese: 'こんばんは',
+          reading: 'konbanwa',
+          answer: { emoji: '🌙', label: 'Chào buổi tối' },
+          wrong: [
+            { emoji: '👋', label: 'Tạm biệt' },
+            { emoji: '🙏', label: 'Cảm ơn' },
+            { emoji: '🌅', label: 'Chào buổi sáng' },
+          ],
+        }),
+        typing({
+          id: 'u1-l1-e5',
           explanation: 'さようなら dùng khi chia tay, trang trọng hơn じゃあね.',
           text: 'Tạm biệt',
           accepted: ['さようなら', 'sayounara', 'sayonara'],
           answerLabel: 'さようなら',
-        }),
-        typing({
-          id: 'u1-l1-e5',
-          kind: 'listen-typing',
-          audioText: 'こんばんは',
-          accepted: ['こんばんは', 'konbanwa'],
-          answerLabel: 'こんばんは',
-          explanation: 'こんばんは dùng sau khi trời đã tối.',
         }),
         wordBank({
           id: 'u1-l1-e6',
@@ -96,15 +105,8 @@ export const U1: Unit = {
           wrong: ['すみません', 'こんにちは'],
           explanation: 'ありがとうございます = cảm ơn rất lịch sự.',
         }),
-        typing({
-          id: 'u1-l2-e3',
-          explanation: 'すみません vừa là "xin lỗi" vừa dùng để gọi người khác.',
-          text: 'Xin lỗi',
-          accepted: ['すみません', 'sumimasen'],
-          answerLabel: 'すみません',
-        }),
         selectImage({
-          id: 'u1-l2-e4',
+          id: 'u1-l2-e3',
           japanese: 'ごめんなさい',
           reading: 'gomennasai',
           answer: { emoji: '🙇', label: 'Xin lỗi' },
@@ -116,7 +118,7 @@ export const U1: Unit = {
           explanation: 'ごめんなさい dùng khi chính bạn làm sai.',
         }),
         matchPairs({
-          id: 'u1-l2-e5',
+          id: 'u1-l2-e4',
           explanation: 'はい là "vâng", いいえ là "không".',
           pairs: [
             ['ありがとう', 'Cảm ơn'],
@@ -126,11 +128,19 @@ export const U1: Unit = {
           ],
         }),
         typing({
+          id: 'u1-l2-e5',
+          explanation: 'すみません vừa là "xin lỗi" vừa dùng để gọi người khác.',
+          text: 'Xin lỗi',
+          accepted: ['すみません', 'sumimasen'],
+          answerLabel: 'すみません',
+        }),
+        translateChoice({
           id: 'u1-l2-e6',
-          kind: 'listen-typing',
-          audioText: 'いいえ',
-          accepted: ['いいえ', 'iie'],
-          answerLabel: 'いいえ',
+          japanese: 'いいえ',
+          reading: 'iie',
+          correct: 'Không',
+          wrong: ['Vâng', 'Cảm ơn', 'Xin lỗi'],
+          explanation: 'いいえ là "không"; はい là câu trả lời ngược lại.',
         }),
       ],
     },
@@ -174,10 +184,10 @@ export const U1: Unit = {
         }),
         typing({
           id: 'u1-l3-e4',
-          explanation: 'おちゃ gồm お + ちゃ (hàng ta).',
-          text: 'Trà',
-          accepted: ['おちゃ', 'ocha'],
-          answerLabel: 'おちゃ',
+          explanation: 'あお (màu xanh) chỉ gồm あ và お — hai chữ vừa học.',
+          text: 'Màu xanh',
+          accepted: ['あお', 'ao'],
+          answerLabel: 'あお',
         }),
         typing({
           id: 'u1-l3-e5',
