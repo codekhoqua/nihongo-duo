@@ -4,8 +4,8 @@ import { fillBlank, matchPairs, selectImage, translateChoice, typing, wordBank }
 export const U6: Unit = {
   id: 'u6',
   index: 6,
-  title: 'Unit 6',
-  subtitle: 'Tính từ & cảm xúc',
+  title: 'Tính từ & cảm xúc',
+  subtitle: 'Miêu tả kích thước, tâm trạng và thời tiết',
   color: '#00cd9e',
   lessons: [
     {

@@ -4,8 +4,8 @@ import { fillBlank, matchPairs, selectImage, translateChoice, typing, wordBank }
 export const U3: Unit = {
   id: 'u3',
   index: 3,
-  title: 'Unit 3',
-  subtitle: 'Số đếm & thời gian',
+  title: 'Số đếm & thời gian',
+  subtitle: 'Đếm từ 1 đến 100, xem giờ và các ngày trong tuần',
   color: '#ce82ff',
   lessons: [
     {

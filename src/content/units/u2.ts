@@ -4,8 +4,8 @@ import { fillBlank, matchPairs, selectImage, translateChoice, typing, wordBank }
 export const U2: Unit = {
   id: 'u2',
   index: 2,
-  title: 'Unit 2',
-  subtitle: 'Katakana & tự giới thiệu',
+  title: 'Tự giới thiệu & Katakana',
+  subtitle: 'Nói tên, quốc tịch, nghề nghiệp và sở thích',
   color: '#1cb0f6',
   lessons: [
     {

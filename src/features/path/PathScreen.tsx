@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { CSSProperties } from 'react';
 import { isLessonUnlocked, useDailyQuests, useProgress } from '../../store';
 import { ALL_LESSON_IDS, UNITS } from '../../content';
+import { useFocusTrap } from '../../lib/useFocusTrap';
 import type { Lesson, LessonIcon, Unit } from '../../types';
 import './path.css';
 
@@ -81,6 +82,7 @@ export default function PathScreen({ onStartLesson }: { onStartLesson: (lessonId
 
   const toastTimer = useRef<number | null>(null);
   const shakeTimer = useRef<number | null>(null);
+  const bannerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(
     () => () => {
@@ -115,15 +117,6 @@ export default function PathScreen({ onStartLesson }: { onStartLesson: (lessonId
     setJumpOpen(false);
   }, []);
 
-  useEffect(() => {
-    if (!tipUnitId && !jumpOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeDialogs();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [tipUnitId, jumpOpen, closeDialogs]);
-
   const statusOf = (lesson: Lesson): NodeStatus => {
     const crowns = state.crowns[lesson.id] ?? 0;
     if (crowns > 0) return 'done';
@@ -133,6 +126,11 @@ export default function PathScreen({ onStartLesson }: { onStartLesson: (lessonId
   };
 
   const handleNodeClick = (lesson: Lesson, status: NodeStatus) => {
+    if (state.hearts === 0) {
+      showToast('Bạn đã hết mạng! Nạp tim để học tiếp');
+      bannerRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
     if (status === 'locked') {
       shake(lesson.id);
       showToast('Hoàn thành bài trước nhé!');
@@ -148,13 +146,16 @@ export default function PathScreen({ onStartLesson }: { onStartLesson: (lessonId
     ? (tipUnit.lessons.find((lesson) => lesson.tip) ?? tipUnit.lessons[0])
     : undefined;
 
+  const tipDialogRef = useFocusTrap<HTMLDivElement>(Boolean(tipUnit), closeDialogs);
+  const jumpDialogRef = useFocusTrap<HTMLDivElement>(jumpOpen, closeDialogs);
+
   const heartsEmpty = state.hearts === 0;
   const canRefill = state.gems >= REFILL_COST;
 
   return (
     <div className="screen path">
       {heartsEmpty && (
-        <div className="hearts-banner" role="alert" data-testid="hearts-banner">
+        <div className="hearts-banner" role="alert" data-testid="hearts-banner" ref={bannerRef}>
           <span className="hearts-banner__text">
             <span aria-hidden="true">💔</span> Bạn đã hết mạng!
           </span>
@@ -226,38 +227,40 @@ export default function PathScreen({ onStartLesson }: { onStartLesson: (lessonId
                             />
                           </li>
                         )}
-                        <li
-                          className="path-row"
-                          style={{ transform: `translateX(${offset}px)` }}
-                        >
-                          {status === 'current' && (
-                            <span className="path-bubble" aria-hidden="true">
-                              BẮT ĐẦU
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            className={`path-node path-node--${status}${
-                              shakeId === lesson.id ? ' path-node--shake' : ''
-                            }`}
-                            onClick={() => handleNodeClick(lesson, status)}
-                            aria-label={nodeLabel(lesson, status, crowns)}
-                            data-testid={`lesson-node-${lesson.id}`}
+                        <li className="path-row">
+                          <div
+                            className="path-slot"
+                            style={{ transform: `translateX(${offset}px)` }}
                           >
-                            <span className="path-node__icon" aria-hidden="true">
-                              {status === 'locked'
-                                ? '🔒'
-                                : status === 'done'
-                                  ? '👑'
-                                  : LESSON_ICONS[lesson.icon] ?? '⭐'}
-                            </span>
-                            {status === 'done' && (
-                              <span className="path-node__crown" aria-hidden="true">
-                                👑 {crowns}
+                            {status === 'current' && (
+                              <span className="path-bubble" aria-hidden="true">
+                                BẮT ĐẦU
                               </span>
                             )}
-                          </button>
-                          <span className="path-node__caption">{lesson.title}</span>
+                            <button
+                              type="button"
+                              className={`path-node path-node--${status}${
+                                shakeId === lesson.id ? ' path-node--shake' : ''
+                              }`}
+                              onClick={() => handleNodeClick(lesson, status)}
+                              aria-label={nodeLabel(lesson, status, crowns)}
+                              data-testid={`lesson-node-${lesson.id}`}
+                            >
+                              <span className="path-node__icon" aria-hidden="true">
+                                {status === 'locked'
+                                  ? '🔒'
+                                  : status === 'done'
+                                    ? '👑'
+                                    : LESSON_ICONS[lesson.icon] ?? '⭐'}
+                              </span>
+                              {status === 'done' && (
+                                <span className="path-node__crown" aria-hidden="true">
+                                  👑 {crowns}
+                                </span>
+                              )}
+                            </button>
+                            <span className="path-node__caption">{lesson.title}</span>
+                          </div>
                         </li>
                       </Fragment>
                     );
@@ -351,6 +354,7 @@ export default function PathScreen({ onStartLesson }: { onStartLesson: (lessonId
             aria-labelledby="tip-title"
             onClick={(event) => event.stopPropagation()}
             data-testid="tip-modal"
+            ref={tipDialogRef}
           >
             <p className="modal__emoji" aria-hidden="true">
               💡
@@ -380,6 +384,7 @@ export default function PathScreen({ onStartLesson }: { onStartLesson: (lessonId
             aria-labelledby="jump-title"
             onClick={(event) => event.stopPropagation()}
             data-testid="jump-modal"
+            ref={jumpDialogRef}
           >
             <p className="modal__emoji" aria-hidden="true">
               🚀

@@ -4,8 +4,8 @@ import { fillBlank, matchPairs, selectImage, translateChoice, typing, wordBank }
 export const U4: Unit = {
   id: 'u4',
   index: 4,
-  title: 'Unit 4',
-  subtitle: 'Đồ ăn & nhà hàng',
+  title: 'Đồ ăn & nhà hàng',
+  subtitle: 'Gọi món, miêu tả vị và thanh toán hoá đơn',
   color: '#ff9600',
   lessons: [
     {

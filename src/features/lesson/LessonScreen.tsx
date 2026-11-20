@@ -3,6 +3,7 @@ import { useProgress } from '../../store';
 import { getLesson } from '../../content';
 import { playSfx } from '../../lib/sfx';
 import { speak, stopSpeaking } from '../../lib/speech';
+import { useFocusTrap } from '../../lib/useFocusTrap';
 import type { Exercise } from '../../types';
 import { gradeLesson, isTypingCorrect, isWordBankCorrect } from './lessonEngine';
 import TranslateChoice from './exercises/TranslateChoice';
@@ -78,7 +79,7 @@ function canCheck(exercise: Exercise | undefined, draft: Draft): boolean {
   if (!exercise) return false;
   switch (exercise.kind) {
     case 'word-bank':
-      return draft.bank.length > 0;
+      return draft.bank.length > 0 && draft.bank.length === exercise.answerTokens.length;
     case 'typing':
     case 'listen-typing':
       return draft.text.trim().length > 0;
@@ -114,12 +115,19 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
   const [heartsModal, setHeartsModal] = useState(false);
 
   const completedRef = useRef(false);
+  const answeredRef = useRef<Set<string>>(new Set());
   const penalizedMatch = useRef<Set<string>>(new Set());
   const heartsModalShown = useRef(false);
 
+  const exitDialogRef = useFocusTrap<HTMLDivElement>(confirmExit, () => setConfirmExit(false));
+  const heartsDialogRef = useFocusTrap<HTMLDivElement>(heartsModal);
+
   const current = queue[cursor];
   const exercise = current?.exercise;
-  const doneCount = Object.keys(firstResults).length;
+  /** First-pass correct answers, capped so a pending retry keeps the bar below 100%. */
+  const pendingRetries = queue.slice(cursor).filter((item) => item.pass === 1).length;
+  const firstPassCorrect = Object.values(firstResults).filter(Boolean).length;
+  const doneCount = Math.max(0, Math.min(firstPassCorrect, total - pendingRetries));
 
   const resetDraft = useCallback(() => {
     setChoiceId(null);
@@ -140,6 +148,7 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
     setBank([]);
     setText('');
     completedRef.current = false;
+    answeredRef.current = new Set();
     penalizedMatch.current = new Set();
     heartsModalShown.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -193,13 +202,19 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
 
   const handleCheck = useCallback(() => {
     if (!current || phase !== 'answering') return;
+    /* Out of hearts: the "Hết mạng" dialog must be resolved first. */
+    if (state.hearts === 0) return;
     const target = current.exercise;
     if (!canCheck(target, { choiceId, bank, text })) return;
 
     const verdict = evaluate(target, { choiceId, bank, text });
     setFeedback(verdict);
     setPhase('feedback');
-    dispatch({ type: 'answer', correct: verdict.correct });
+    /* One `answer` per exercise — retries must not count twice. */
+    if (!answeredRef.current.has(target.id)) {
+      answeredRef.current.add(target.id);
+      dispatch({ type: 'answer', correct: verdict.correct });
+    }
     setFirstResults((prev) =>
       prev[target.id] !== undefined ? prev : { ...prev, [target.id]: verdict.correct },
     );
@@ -214,10 +229,12 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
     if (current.pass === 0) {
       setQueue((prev) => [...prev, { exercise: target, pass: 1 }]);
     }
-  }, [current, phase, choiceId, bank, text, dispatch, soundOn]);
+  }, [current, phase, state.hearts, choiceId, bank, text, dispatch, soundOn]);
 
   const handleContinue = useCallback(() => {
     if (phase !== 'feedback') return;
+    /* Do not leave the feedback screen while out of hearts. */
+    if (state.hearts === 0) return;
     if (cursor + 1 >= queue.length) {
       finish();
       return;
@@ -226,7 +243,7 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
     setPhase('answering');
     resetDraft();
     setCursor(cursor + 1);
-  }, [phase, cursor, queue.length, finish, resetDraft]);
+  }, [phase, state.hearts, cursor, queue.length, finish, resetDraft]);
 
   const handleFinish = useCallback(() => {
     if (!result) return;
@@ -249,22 +266,35 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
 
   const handleMatchComplete = useCallback(() => {
     if (!current || phase !== 'answering') return;
+    if (state.hearts === 0) return;
     const target = current.exercise;
     const verdict = evaluate(target, { choiceId, bank, text });
     setFeedback(verdict);
     setPhase('feedback');
-    dispatch({ type: 'answer', correct: true });
+    /* A mid-round mistake already dispatched the single `answer` for this exercise. */
+    if (!answeredRef.current.has(target.id)) {
+      answeredRef.current.add(target.id);
+      dispatch({ type: 'answer', correct: true });
+    }
     playSfx('correct', soundOn);
     setFirstResults((prev) =>
       prev[target.id] !== undefined ? prev : { ...prev, [target.id]: true },
     );
-  }, [current, phase, choiceId, bank, text, dispatch, soundOn]);
+  }, [current, phase, state.hearts, choiceId, bank, text, dispatch, soundOn]);
 
   const handleMatchMistake = useCallback(() => {
     if (!exercise) return;
-    if (penalizedMatch.current.has(exercise.id)) return;
-    penalizedMatch.current.add(exercise.id);
-    dispatch({ type: 'answer', correct: false });
+    const target = exercise;
+    /* First wrong pair decides the exercise verdict — never "perfect" afterwards. */
+    if (!answeredRef.current.has(target.id)) {
+      answeredRef.current.add(target.id);
+      dispatch({ type: 'answer', correct: false });
+      setFirstResults((prev) =>
+        prev[target.id] !== undefined ? prev : { ...prev, [target.id]: false },
+      );
+    }
+    if (penalizedMatch.current.has(target.id)) return;
+    penalizedMatch.current.add(target.id);
     dispatch({ type: 'lose-heart' });
     playSfx('wrong', soundOn);
   }, [exercise, dispatch, soundOn]);
@@ -329,21 +359,6 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
     handleContinue,
     handleFinish,
   ]);
-
-  /* Escape closes the top-most dialog. */
-  useEffect(() => {
-    if (!confirmExit && !heartsModal) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      if (confirmExit) {
-        setConfirmExit(false);
-        return;
-      }
-      setHeartsModal(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [confirmExit, heartsModal]);
 
   /* --------------------------------------------------------------- views */
 
@@ -570,6 +585,7 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
             role="dialog"
             aria-modal="true"
             aria-labelledby="exit-title"
+            ref={exitDialogRef}
             onClick={(event) => event.stopPropagation()}
           >
             <p className="modal__emoji" aria-hidden="true">
@@ -605,6 +621,7 @@ export default function LessonScreen({ lessonId, onExit }: { lessonId: string; o
             aria-modal="true"
             aria-labelledby="hearts-title"
             data-testid="hearts-modal"
+            ref={heartsDialogRef}
           >
             <p className="modal__emoji" aria-hidden="true">
               💔

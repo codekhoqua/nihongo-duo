@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useProgress } from '../../store';
+import { useFocusTrap } from '../../lib/useFocusTrap';
 import './screens.css';
 
 const REFILL_COST = 350;
@@ -14,6 +15,8 @@ export default function ShopScreen({ onBack }: { onBack: () => void }) {
   const { state, dispatch } = useProgress();
   const [toast, setToast] = useState<string | null>(null);
   const [showDemo, setShowDemo] = useState(false);
+  const closeDemo = () => setShowDemo(false);
+  const demoRef = useFocusTrap<HTMLDivElement>(showDemo, closeDemo);
 
   useEffect(() => {
     if (!toast) return;
@@ -124,14 +127,23 @@ export default function ShopScreen({ onBack }: { onBack: () => void }) {
       )}
 
       {showDemo && (
-        <div className="modal-backdrop" onClick={() => setShowDemo(false)}>
+        <div className="modal-backdrop" onClick={closeDemo}>
           <div
-            className="modal"
+            ref={demoRef}
+            className="modal modal--with-close"
             role="dialog"
             aria-modal="true"
             aria-labelledby="demo-modal-title"
             onClick={(event) => event.stopPropagation()}
           >
+            <button
+              type="button"
+              className="icon-btn modal__close"
+              aria-label="Đóng"
+              onClick={closeDemo}
+            >
+              ✕
+            </button>
             <div className="modal__emoji" aria-hidden="true">
               🎁
             </div>
@@ -143,7 +155,7 @@ export default function ShopScreen({ onBack }: { onBack: () => void }) {
               miễn phí ở phía trên.
             </p>
             <div className="modal__actions">
-              <button type="button" className="btn btn--primary btn--block" onClick={() => setShowDemo(false)}>
+              <button type="button" className="btn btn--primary btn--block" onClick={closeDemo}>
                 Đã hiểu
               </button>
             </div>

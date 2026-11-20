@@ -547,7 +547,7 @@
 }
 
 .lesson__footer--ok .verdict__title {
-  color: var(--duo-green-dark);
+  color: #2f6b00;
 }
 
 .lesson__footer--bad .verdict__title {

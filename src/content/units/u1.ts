@@ -4,8 +4,8 @@ import { fillBlank, matchPairs, selectImage, translateChoice, typing, wordBank }
 export const U1: Unit = {
   id: 'u1',
   index: 1,
-  title: 'Unit 1',
-  subtitle: 'Hiragana & chào hỏi',
+  title: 'Chào hỏi & Hiragana',
+  subtitle: 'Chào, cảm ơn, xin lỗi và bảng chữ cái',
   color: '#58cc02',
   lessons: [
     {

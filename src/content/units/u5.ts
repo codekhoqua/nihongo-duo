@@ -4,8 +4,8 @@ import { fillBlank, matchPairs, selectImage, translateChoice, typing, wordBank }
 export const U5: Unit = {
   id: 'u5',
   index: 5,
-  title: 'Unit 5',
-  subtitle: 'Đi lại & địa điểm',
+  title: 'Đi lại & địa điểm',
+  subtitle: 'Hỏi đường, chỉ chỗ và chọn phương tiện di chuyển',
   color: '#ff4b4b',
   lessons: [
     {

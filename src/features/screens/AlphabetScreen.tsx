@@ -42,7 +42,7 @@ export default function AlphabetScreen({ onBack }: { onBack: () => void }) {
           data-testid="alphabet-tab-hiragana"
           onClick={() => switchScript('hiragana')}
         >
-          Hiragana
+          Hiragana あ
         </button>
         <button
           type="button"
@@ -52,7 +52,7 @@ export default function AlphabetScreen({ onBack }: { onBack: () => void }) {
           data-testid="alphabet-tab-katakana"
           onClick={() => switchScript('katakana')}
         >
-          Katakana
+          Katakana ア
         </button>
       </div>
 
